@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --color-background: #ffffff;
+        --color-foreground: #000000;
+        --color-card: #ffffff;
+        --color-card-foreground: #000000;
+        --color-card-dark: #1a1a1a;
+        --color-card-dark-foreground: #ffffff;
+        --color-border: #e5e5e5;
+        --color-muted: #f5f5f5;
+        --color-muted-foreground: #737373;
+        --color-primary: #000000;
+        --color-primary-foreground: #ffffff;
+        --color-destructive: #ef4444;
+        --color-destructive-foreground: #ffffff;
+        --color-accent-yellow: #e2de7e;
+        --color-accent-purple: #c7a6e9;
+        --color-accent: #f5f5f5;
+        --color-accent-foreground: #000000;
+        --color-surface: #fafafa;
+        --color-surface-foreground: #000000;
+    }
+
+    .dark {
+        --color-background: #000000;
+        --color-foreground: #ffffff;
+        --color-card: #1a1a1a;
+        --color-card-foreground: #ffffff;
+        --color-card-dark: #111111;
+        --color-card-dark-foreground: #ffffff;
+        --color-border: #2a2a2a;
+        --color-muted: #1a1a1a;
+        --color-muted-foreground: #a3a3a3;
+        --color-primary: #ffffff;
+        --color-primary-foreground: #000000;
+        --color-destructive: #dc2626;
+        --color-destructive-foreground: #ffffff;
+        --color-accent-yellow: #e2de7e;
+        --color-accent-purple: #c7a6e9;
+        --color-accent: #1a1a1a;
+        --color-accent-foreground: #ffffff;
+        --color-surface: #111111;
+        --color-surface-foreground: #ffffff;
+    }
+}
