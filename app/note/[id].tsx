@@ -1,44 +1,103 @@
-import { useEffect, useState } from "react";
-import { View, Alert } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Alert, KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import Animated, { FadeIn } from "react-native-reanimated";
-import { Input } from "@/components/ui/input";
+import {
+    RichText,
+    Toolbar,
+    useEditorBridge,
+    useEditorContent,
+    TenTapStartKit,
+    darkEditorCss,
+    editorHtml,
+} from "@10play/tentap-editor";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useNotes } from "@/hooks/use-notes";
-import { formatDate } from "@/lib/utils";
+import { formatDate, extractFirstLine } from "@/lib/utils";
 import { success, warning } from "@/lib/haptics";
 import { COLORS } from "@/lib/constants";
 import { useTheme } from "@/hooks/use-theme";
 import type { Note } from "@/lib/types";
+
+function buildCustomSource(isDark: boolean, colors: typeof COLORS["light"] | typeof COLORS["dark"]) {
+    const customCss = `
+        body {
+            background-color: ${colors.background} !important;
+            color: ${colors.foreground} !important;
+            font-family: 'Lato', -apple-system, sans-serif !important;
+            font-size: 16px;
+            padding: 16px;
+            margin: 0;
+            line-height: 1.6;
+        }
+        * { background-color: ${colors.background}; }
+        h1 { font-size: 2rem; font-weight: 900; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        h3 { font-size: 1.2rem; font-weight: 700; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        p { margin: 0 0 4px; color: ${colors.foreground}; background: transparent; }
+        ul, ol { padding-left: 1.2em; }
+        li { color: ${colors.foreground}; background: transparent; }
+        code { background: ${isDark ? "#2a2a2a" : "#f0f0f0"} !important; border-radius: 4px; padding: 2px 6px; font-size: 0.9em; }
+        blockquote { border-left: 3px solid ${colors.border}; margin: 0; padding-left: 1em; color: ${colors.mutedForeground}; background: transparent; }
+        strong { font-family: 'Lato', sans-serif; font-weight: 700; }
+        em { font-family: 'Lato', sans-serif; font-style: italic; }
+    `;
+    const base = isDark ? editorHtml.replace("</style>", `${darkEditorCss}</style>`) : editorHtml;
+    return base.replace("</style>", `${customCss}</style>`);
+}
 
 export default function NoteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const { resolvedTheme } = useTheme();
     const colors = COLORS[resolvedTheme];
+    const isDark = resolvedTheme === "dark";
     const { notes, updateNote, removeNote } = useNotes();
 
-    const [title, setTitle] = useState("");
-    const [content, setContent] = useState("");
     const [note, setNote] = useState<Note | null>(null);
+    const initialised = useRef(false);
+
+    const editor = useEditorBridge({
+        autofocus: false,
+        avoidIosKeyboard: true,
+        initialContent: "",
+        bridgeExtensions: TenTapStartKit,
+        customSource: buildCustomSource(isDark, colors),
+        theme: {
+            toolbar: {
+                toolbarBody: {
+                    backgroundColor: colors.card,
+                    borderTopColor: colors.border,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                },
+                toolbarButton: {
+                    tintColor: colors.foreground,
+                } as any,
+            },
+            webview: {
+                backgroundColor: colors.background,
+            },
+        },
+    });
+
+    const htmlContent = useEditorContent(editor, { type: "html", debounceInterval: 300 });
 
     useEffect(() => {
         const found = notes.find((n) => n.id === id);
-        if (found) {
+        if (found && !initialised.current) {
             setNote(found);
-            setTitle(found.title);
-            setContent(found.content);
+            initialised.current = true;
+            setTimeout(() => {
+                editor.setContent(found.content);
+            }, 150);
         }
     }, [id, notes]);
 
     const handleSave = async () => {
         if (!note) return;
-        await updateNote({
-            ...note,
-            title: title.trim(),
-            content: content.trim(),
-        });
+        const html = htmlContent ?? note.content;
+        const title = extractFirstLine(html) || note.title || "Untitled";
+        await updateNote({ ...note, title, content: html });
         success();
         router.back();
     };
@@ -64,85 +123,48 @@ export default function NoteDetailScreen() {
 
     if (!note) {
         return (
-            <View className="flex-1 bg-background items-center justify-center">
-                <Text variant="caption">Note not found.</Text>
+            <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+                <Text variant="caption">Loading…</Text>
             </View>
         );
     }
 
     return (
-        <View className="flex-1 bg-background">
+        <KeyboardAvoidingView
+            style={{ flex: 1, backgroundColor: colors.background }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
             <Stack.Screen
                 options={{
                     headerBackTitle: "BACK",
                     headerRight: () => (
-                        <Button
-                            label="DONE"
-                            variant="ghost"
-                            size="sm"
-                            onPress={handleSave}
-                            disabled={!title.trim() && !content.trim()}
-                        />
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                            <Button
+                                label="DELETE"
+                                variant="ghost"
+                                size="sm"
+                                onPress={handleDelete}
+                            />
+                            <Button
+                                label="DONE"
+                                variant="ghost"
+                                size="sm"
+                                onPress={handleSave}
+                            />
+                        </View>
                     ),
                 }}
             />
 
-            <Animated.View
-                entering={FadeIn.duration(400)}
-                className="flex-1 px-5"
-            >
-                {/* Meta info bar */}
-                <View className="flex-row items-center justify-between mb-4">
-                    <Text variant="caption">
-                        {formatDate(note.updatedAt)} · {note.content.length}
-                    </Text>
-                </View>
+            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+                <Text variant="caption">
+                    {formatDate(note.updatedAt)}
+                </Text>
+            </View>
 
-                <Input
-                    variant="ghost"
-                    placeholder="Title"
-                    value={title}
-                    onChangeText={setTitle}
-                    className="text-3xl font-extrabold"
-                />
+            <RichText editor={editor} style={{ flex: 1 }} />
 
-                {/* Color tag badge */}
-                {note.isPinned && (
-                    <View className="self-start mt-1 px-3 py-1 rounded-md bg-primary">
-                        <Text className="text-xs font-semibold text-primary-foreground">
-                            Pinned
-                        </Text>
-                    </View>
-                )}
-
-                <Input
-                    variant="ghost"
-                    placeholder="Start writing…"
-                    value={content}
-                    onChangeText={setContent}
-                    multiline
-                    textAlignVertical="top"
-                    className="flex-1 text-base mt-3"
-                />
-
-                {/* Bottom action bar */}
-                <View className="flex-row items-center justify-center gap-3 pb-8 pt-3">
-                    <Button
-                        label="Save"
-                        onPress={handleSave}
-                        className="flex-1"
-                        size="lg"
-                        disabled={!title.trim() && !content.trim()}
-                    />
-                    <Button
-                        label="Delete"
-                        variant="destructive"
-                        onPress={handleDelete}
-                        size="lg"
-                        className="w-24"
-                    />
-                </View>
-            </Animated.View>
-        </View>
+            <Toolbar editor={editor} />
+        </KeyboardAvoidingView>
     );
 }

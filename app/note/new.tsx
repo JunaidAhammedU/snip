@@ -1,74 +1,127 @@
-import { useState } from "react";
-import { View, Pressable } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Input } from "@/components/ui/input";
+import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import {
+    RichText,
+    Toolbar,
+    useEditorBridge,
+    useEditorContent,
+    TenTapStartKit,
+    darkEditorCss,
+    editorHtml,
+} from "@10play/tentap-editor";
 import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
 import { useNotes } from "@/hooks/use-notes";
+import { useFolders } from "@/hooks/use-folders";
 import { success } from "@/lib/haptics";
-import type { Note } from "@/lib/types";
+import { COLORS } from "@/lib/constants";
+import { useTheme } from "@/hooks/use-theme";
+import { extractFirstLine, createNote } from "@/lib/utils";
+import * as storage from "@/lib/storage";
 
-const COLOR_OPTIONS: { label: string; value: Note["colorTag"]; color: string }[] = [
-    { label: "Default", value: "default", color: "bg-card border border-border" },
-    { label: "Yellow", value: "yellow", color: "bg-accent-yellow" },
-    { label: "Purple", value: "purple", color: "bg-accent-purple" },
-];
+function buildCustomSource(isDark: boolean, colors: typeof COLORS["light"] | typeof COLORS["dark"]) {
+    const customCss = `
+        body {
+            background-color: ${colors.background} !important;
+            color: ${colors.foreground} !important;
+            font-family: 'Lato', -apple-system, sans-serif !important;
+            font-size: 16px;
+            padding: 16px;
+            margin: 0;
+            line-height: 1.6;
+        }
+        * { background-color: ${colors.background}; }
+        h1 { font-size: 2rem; font-weight: 900; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        h3 { font-size: 1.2rem; font-weight: 700; margin: 0 0 8px; color: ${colors.foreground}; background: transparent; }
+        p { margin: 0 0 4px; color: ${colors.foreground}; background: transparent; }
+        ul, ol { padding-left: 1.2em; }
+        li { color: ${colors.foreground}; background: transparent; }
+        code { background: ${isDark ? "#2a2a2a" : "#f0f0f0"} !important; border-radius: 4px; padding: 2px 6px; font-size: 0.9em; }
+        blockquote { border-left: 3px solid ${colors.border}; margin: 0; padding-left: 1em; color: ${colors.mutedForeground}; background: transparent; }
+        strong { font-family: 'Lato', sans-serif; font-weight: 700; }
+        em { font-family: 'Lato', sans-serif; font-style: italic; }
+    `;
+    const base = isDark ? editorHtml.replace("</style>", `${darkEditorCss}</style>`) : editorHtml;
+    return base.replace("</style>", `${customCss}</style>`);
+}
 
 export default function NewNoteScreen() {
     const router = useRouter();
-    const { folderId } = useLocalSearchParams<{ folderId: string }>();
-    const { addNote } = useNotes(folderId);
-    const [title, setTitle] = useState("");
-    const [content, setContent] = useState("");
-    const [colorTag, setColorTag] = useState<Note["colorTag"]>("default");
+    const { folderId } = useLocalSearchParams<{ folderId?: string }>();
+    const { resolvedTheme } = useTheme();
+    const colors = COLORS[resolvedTheme];
+    const isDark = resolvedTheme === "dark";
+
+    const { addNote } = useNotes(folderId ?? undefined);
+    const { addFolder } = useFolders();
+
+    const editor = useEditorBridge({
+        autofocus: true,
+        avoidIosKeyboard: true,
+        initialContent: "",
+        bridgeExtensions: TenTapStartKit,
+        customSource: buildCustomSource(isDark, colors),
+        theme: {
+            toolbar: {
+                toolbarBody: {
+                    backgroundColor: colors.card,
+                    borderTopColor: colors.border,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                },
+                toolbarButton: {
+                    tintColor: colors.foreground,
+                } as any,
+            },
+            webview: {
+                backgroundColor: colors.background,
+            },
+        },
+    });
+
+    const htmlContent = useEditorContent(editor, { type: "html", debounceInterval: 300 });
 
     const handleSave = async () => {
-        if (!folderId) return;
-        await addNote(title.trim(), content.trim(), colorTag);
+        const html = htmlContent ?? "";
+        const empty = !html || html === "<p></p>" || html === "<p><br></p>";
+        if (empty) { router.back(); return; }
+
+        const title = extractFirstLine(html) || "Untitled";
+
+        if (folderId) {
+            await addNote(title, html, "default");
+        } else {
+            const folder = await addFolder(title);
+            const note = createNote(folder.id, title, html);
+            await storage.saveNote(note);
+        }
+
         success();
         router.back();
     };
 
     return (
-        <View className="flex-1 bg-background p-5 gap-4">
-            <Input
-                variant="ghost"
-                placeholder="Title"
-                value={title}
-                onChangeText={setTitle}
-                className="text-3xl font-extrabold"
-                autoFocus
-            />
-            <Input
-                variant="ghost"
-                placeholder="Start writing…"
-                value={content}
-                onChangeText={setContent}
-                multiline
-                textAlignVertical="top"
-                className="flex-1 text-base"
+        <KeyboardAvoidingView
+            style={{ flex: 1, backgroundColor: colors.background }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+            <Stack.Screen
+                options={{
+                    title: "New Note",
+                    headerBackTitle: "BACK",
+                    headerRight: () => (
+                        <Button
+                            label="SAVE"
+                            variant="ghost"
+                            size="sm"
+                            onPress={handleSave}
+                        />
+                    ),
+                }}
             />
 
-            {/* Color tag selector */}
-            <View className="flex-row items-center gap-3 py-2">
-                <Text variant="caption" className="mr-1">
-                    Color:
-                </Text>
-                {COLOR_OPTIONS.map((opt) => (
-                    <Pressable
-                        key={opt.value}
-                        className={`h-8 w-8 rounded-full ${opt.color} ${colorTag === opt.value ? "border-2 border-primary" : ""}`}
-                        onPress={() => setColorTag(opt.value)}
-                    />
-                ))}
-            </View>
+            <RichText editor={editor} style={{ flex: 1 }} />
 
-            <Button
-                label="Save Note"
-                onPress={handleSave}
-                disabled={!title.trim() && !content.trim()}
-                size="lg"
-            />
-        </View>
+            <Toolbar editor={editor} />
+        </KeyboardAvoidingView>
     );
 }

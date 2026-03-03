@@ -21,8 +21,22 @@ const variantClasses: Record<NonNullable<Props["variant"]>, string> = {
     number: "text-xs text-muted-foreground font-medium",
 };
 
-export function Text({ variant = "body", className = "", ...props }: Props) {
+const variantFonts: Record<NonNullable<Props["variant"]>, string> = {
+    body: "Lato_400Regular",
+    heading: "Lato_700Bold",
+    largeHeading: "Lato_900Black",
+    title: "Lato_700Bold",
+    caption: "Lato_400Regular",
+    label: "Lato_700Bold",
+    number: "Lato_400Regular",
+};
+
+export function Text({ variant = "body", className = "", style, ...props }: Props) {
     return (
-        <RNText className={`${variantClasses[variant]} ${className}`} {...props} />
+        <RNText
+            className={`${variantClasses[variant]} ${className}`}
+            style={[{ fontFamily: variantFonts[variant] }, style]}
+            {...props}
+        />
     );
 }

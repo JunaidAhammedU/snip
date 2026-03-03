@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Alert, TextInput } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -18,7 +18,7 @@ export default function FoldersScreen() {
   const insets = useSafeAreaInsets();
   const { resolvedTheme } = useTheme();
   const colors = COLORS[resolvedTheme];
-  const { folders, isLoading, refresh, addFolder, getFoldersWithCounts } =
+  const { folders, isLoading, refresh, getFoldersWithCounts } =
     useFolders();
   const [foldersWithCounts, setFoldersWithCounts] = useState<
     FolderWithCount[]
@@ -38,24 +38,9 @@ export default function FoldersScreen() {
     await loadCounts();
   };
 
-  const handleAddFolder = () => {
-    Alert.prompt(
-      "New Folder",
-      "Enter a name for this folder",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Create",
-          onPress: async (name?: string) => {
-            if (name?.trim()) {
-              mediumTap();
-              await addFolder(name.trim());
-            }
-          },
-        },
-      ],
-      "plain-text"
-    );
+  const handleAddNote = () => {
+    mediumTap();
+    router.push("/note/new");
   };
 
   return (
@@ -104,7 +89,7 @@ export default function FoldersScreen() {
             label="＋"
             variant="outline"
             size="icon"
-            onPress={handleAddFolder}
+            onPress={handleAddNote}
           />
         </View>
       </Animated.View>
