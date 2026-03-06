@@ -4,38 +4,10 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, useTheme } from "@/providers/theme-provider";
 import { COLORS } from "@/lib/constants";
-import { useFonts } from "@expo-google-fonts/lato";
-import {
-  Lato_400Regular,
-  Lato_400Regular_Italic,
-  Lato_700Bold,
-  Lato_700Bold_Italic,
-  Lato_900Black,
-} from "@expo-google-fonts/lato";
-import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
 
-SplashScreen.preventAutoHideAsync();
-
-function App() {
+function RootStack() {
   const { resolvedTheme } = useTheme();
   const colors = COLORS[resolvedTheme];
-
-  const [fontsLoaded] = useFonts({
-    Lato_400Regular,
-    Lato_400Regular_Italic,
-    Lato_700Bold,
-    Lato_700Bold_Italic,
-    Lato_900Black,
-  });
-
-  useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
-
-  if (!fontsLoaded) return null;
 
   return (
     <>
@@ -49,7 +21,7 @@ function App() {
           },
           headerBackTitle: "BACK",
           headerTitleStyle: {
-            fontFamily: "Lato_700Bold",
+            fontWeight: "700",
             fontSize: 16,
           },
         }}
@@ -74,7 +46,9 @@ function App() {
           options={{ title: "" }}
         />
       </Stack>
-      <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
+      <StatusBar
+        style={resolvedTheme === "dark" ? "light" : "dark"}
+      />
     </>
   );
 }
@@ -82,7 +56,7 @@ function App() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <App />
+      <RootStack />
     </ThemeProvider>
   );
 }

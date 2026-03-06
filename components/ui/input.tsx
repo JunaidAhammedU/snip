@@ -13,14 +13,12 @@ const variantClasses = {
 export function Input({
     variant = "default",
     className = "",
-    style,
     ...props
 }: Props) {
     return (
         <TextInput
             className={`text-base ${variantClasses[variant]} ${className}`}
             placeholderClassName="text-muted-foreground"
-            style={[{ fontFamily: "Lato_400Regular" }, style]}
             {...props}
         />
     );
